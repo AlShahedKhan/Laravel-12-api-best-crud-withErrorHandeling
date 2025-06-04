@@ -6,15 +6,6 @@ use Illuminate\Http\JsonResponse;
 
 trait HandlesApiResponses
 {
-    /**
-     * Return a success JSON response.
-     *
-     * @param mixed $data
-     * @param string $message
-     * @param int $status
-     * @param array $headers
-     * @return JsonResponse
-     */
     protected function successResponse(
         mixed $data = null,
         string $message = 'Success',
@@ -24,6 +15,7 @@ trait HandlesApiResponses
         $response = [
             'success' => true,
             'message' => $message,
+            'status' => $status, // Add this line
             'timestamp' => now()->toISOString(),
         ];
 
