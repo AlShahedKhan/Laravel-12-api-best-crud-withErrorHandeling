@@ -32,36 +32,68 @@ class BlogController extends Controller
 
     public function getAllOrOneOrDestroy(Request $request, $id = null)
     {
-        // Example: Unauthorized access
-        if ($request->header('X-Unauthorized') === '1') {
-            throw new UnauthorizedException('You must be logged in.');
-        }
+        // // Example: Unauthorized access
+        // if ($request->header('X-Unauthorized') === '1') {
+        //     throw new UnauthorizedException('You must be logged in.');
+        // }
 
-        // Example: Forbidden access
-        if ($request->header('X-Forbidden') === '1') {
-            throw new ForbiddenException('You do not have permission to access this resource.');
-        }
+        // // Example: Forbidden access
+        // if ($request->header('X-Forbidden') === '1') {
+        //     throw new ForbiddenException('You do not have permission to access this resource.');
+        // }
 
-        // Example: Invalid token
-        if ($request->header('X-Invalid-Token') === '1') {
-            throw new InvalidTokenException('access_token', 'invalid');
-        }
+        // // Example: Invalid token
+        // if ($request->header('X-Invalid-Token') === '1') {
+        //     throw new InvalidTokenException('access_token', 'invalid');
+        // }
 
-        // Example: Token expired
-        if ($request->header('X-Token-Expired') === '1') {
-            throw new TokenExpiredException('access_token');
-        }
+        // // Example: Token expired
+        // if ($request->header('X-Token-Expired') === '1') {
+        //     throw new TokenExpiredException('access_token');
+        // }
 
-        // Example: Refresh token expired
-        if ($request->header('X-Refresh-Token-Expired') === '1') {
-            throw new RefreshTokenExpiredException();
-        }
+        // // Example: Refresh token expired
+        // if ($request->header('X-Refresh-Token-Expired') === '1') {
+        //     throw new RefreshTokenExpiredException();
+        // }
 
-        // Example: Request timeout
-        if ($request->header('X-Request-Timeout') === '1') {
-            throw new RequestTimeoutException();
-        }
+        // // Example: Request timeout
+        // if ($request->header('X-Request-Timeout') === '1') {
+        //     throw new RequestTimeoutException();
+        // }
 
+        $start = microtime(true);
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                throw new UnauthorizedException('You must be logged in.');
+            }
+            if (!$user->isAdmin()) {
+                throw new ForbiddenException('You do not have permission to view or delete blogs.');
+            }
+
+            try {
+                $user = JWTAuth::parseToken()->authenticate();
+                if (!$user) {
+                    throw new InvalidTokenException('access token', 'invalid user');
+                }
+            } catch (TymonTokenExpiredException $e) {
+                throw new CustomTokenExpiredException();
+            } catch (JWTException $e) {
+                throw new InvalidTokenException('access token', 'invalid');
+            }
+
+            // sleep(2); // Simulate a slow operation for demo purposes
+            // Check for timeout before proceeding
+            $this->checkRequestTimeout($start, 1); // 1 second for demo
+        } catch (NotFoundException $e) {
+            throw $e;
+        } catch (RequestTimeoutException $e) {
+            throw $e; // Let the handler return 408
+        } catch (\Throwable $e) {
+            Log::error('Error in BlogController@getAllOrOneOrDestroy: ' . $e->getMessage());
+            throw new InternalServerErrorException('Failed to fetch blogs', ['error' => $e->getMessage()]);
+        }
         if (!in_array($request->method(), ['GET', 'DELETE'])) {
             throw new \App\Exceptions\MethodNotAllowedException();
         }
@@ -91,52 +123,50 @@ class BlogController extends Controller
     {
         $start = microtime(true);
 
-        $user = Auth::user();
-        if (!$user) {
-            throw new UnauthorizedException('You must be logged in.');
-        }
-        if (!$user->isAdmin()) {
-            throw new ForbiddenException('You do not have permission to create or update blogs.');
-        }
         try {
-            $user = JWTAuth::parseToken()->authenticate();
+            $user = Auth::user();
             if (!$user) {
-                throw new InvalidTokenException('access token', 'invalid user');
+                throw new UnauthorizedException('You must be logged in.');
             }
-        } catch (TymonTokenExpiredException $e) {
-            throw new CustomTokenExpiredException();
-        } catch (JWTException $e) {
-            throw new InvalidTokenException('access token', 'invalid');
-        }
+            if (!$user->isAdmin()) {
+                throw new ForbiddenException('You do not have permission to create or update blogs.');
+            }
 
-        // Example: Request timeout (manual trigger for testing)
-        if ($request->header('X-Request-Timeout') === '1') {
-            throw new RequestTimeoutException();
-        }
+            try {
+                $user = JWTAuth::parseToken()->authenticate();
+                if (!$user) {
+                    throw new InvalidTokenException('access token', 'invalid user');
+                }
+            } catch (TymonTokenExpiredException $e) {
+                throw new CustomTokenExpiredException();
+            } catch (JWTException $e) {
+                throw new InvalidTokenException('access token', 'invalid');
+            }
 
-        if (!in_array($request->method(), ['POST', 'PUT'])) {
-            throw new \App\Exceptions\MethodNotAllowedException();
-        }
-        $errors = [];
-        $data = $request->has('data')
-            ? json_decode($request->input('data'), true)
-            : ($request->isJson() ? $request->json()->all() : $request->only(['title', 'content']));
-        if (!isset($data['title']) || empty($data['title'])) {
-            $errors['title'][] = 'Title is required.';
-        }
-        if (!isset($data['content']) || empty($data['content'])) {
-            $errors['content'][] = 'Content is required.';
-        }
-        if ($errors) {
-            throw new ValidationException($errors);
-        }
+            if (!in_array($request->method(), ['POST', 'PUT'])) {
+                throw new \App\Exceptions\MethodNotAllowedException();
+            }
 
-        if ($request->hasFile('image')) {
-            $image = $request->file('image')->store('blogs', 'public');
-            $data['image'] = $image;
-        }
+            $errors = [];
+            $data = $request->has('data')
+                ? json_decode($request->input('data'), true)
+                : ($request->isJson() ? $request->json()->all() : $request->only(['title', 'content']));
 
-        try {
+            if (!isset($data['title']) || empty($data['title'])) {
+                $errors['title'][] = 'Title is required.';
+            }
+            if (!isset($data['content']) || empty($data['content'])) {
+                $errors['content'][] = 'Content is required.';
+            }
+            if ($errors) {
+                throw new ValidationException($errors);
+            }
+
+            if ($request->hasFile('image')) {
+                $image = $request->file('image')->store('blogs', 'public');
+                $data['image'] = $image;
+            }
+
             if ($id) {
                 $blog = Blog::find($id);
                 if (!$blog) {
@@ -165,6 +195,8 @@ class BlogController extends Controller
             }
         } catch (NotFoundException $e) {
             throw $e;
+        } catch (RequestTimeoutException $e) {
+            throw $e; // Let the handler return 408
         } catch (\Throwable $e) {
             throw new InternalServerErrorException('Failed to save blog', ['error' => $e->getMessage()]);
         }
