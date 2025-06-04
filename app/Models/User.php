@@ -49,4 +49,12 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+    public function isAdmin(): bool
+    {
+        // If you use a 'role' column
+        return $this->role === self::ROLE_ADMIN;
+        // If you use a boolean 'is_admin' column, use:
+        // return (bool) $this->is_admin;
+    }
 }

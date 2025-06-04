@@ -135,11 +135,10 @@ class Handler extends ExceptionHandler
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'message' => 'Unauthenticated',
-                    'code' => 'UNAUTHENTICATED',
+                    'message' => 'Unauthorized access',
+                    'code' => 'UNAUTHORIZED',
                     'status' => 401,
                     'timestamp' => now()->toISOString(),
-                    'action_required' => 'login_required'
                 ]
             ], 401);
         }
