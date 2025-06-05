@@ -21,102 +21,49 @@ use App\Exceptions\ResourceCreatedException;
 use App\Exceptions\InternalServerErrorException;
 use App\Exceptions\RefreshTokenExpiredException;
 use App\Exceptions\TokenExpiredException as CustomTokenExpiredException;
+use App\Traits\AuthenticatedAdminCheck;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException as TymonTokenExpiredException;
 use App\Traits\ChecksRequestTimeout;
 
-
-
 class BlogController extends Controller
 {
-    use HandlesApiResponses, ChecksRequestTimeout;
+    use HandlesApiResponses, ChecksRequestTimeout, AuthenticatedAdminCheck;
 
     public function getAllOrOneOrDestroy(Request $request, $id = null)
     {
-        // // Example: Unauthorized access
-        // if ($request->header('X-Unauthorized') === '1') {
-        //     throw new UnauthorizedException('You must be logged in.');
-        // }
-
-        // // Example: Forbidden access
-        // if ($request->header('X-Forbidden') === '1') {
-        //     throw new ForbiddenException('You do not have permission to access this resource.');
-        // }
-
-        // // Example: Invalid token
-        // if ($request->header('X-Invalid-Token') === '1') {
-        //     throw new InvalidTokenException('access_token', 'invalid');
-        // }
-
-        // // Example: Token expired
-        // if ($request->header('X-Token-Expired') === '1') {
-        //     throw new TokenExpiredException('access_token');
-        // }
-
-        // // Example: Refresh token expired
-        // if ($request->header('X-Refresh-Token-Expired') === '1') {
-        //     throw new RefreshTokenExpiredException();
-        // }
-
-        // // Example: Request timeout
-        // if ($request->header('X-Request-Timeout') === '1') {
-        //     throw new RequestTimeoutException();
-        // }
-
         $start = microtime(true);
         try {
-            $user = Auth::user();
-            if (!$user) {
-                throw new UnauthorizedException('You must be logged in.');
-            }
-            if (!$user->isAdmin()) {
-                throw new ForbiddenException('You do not have permission to view or delete blogs.');
+            $this->checkIfAuthenticatedAndAdmin();
+            if (!in_array($request->method(), ['GET', 'DELETE'])) {
+                throw new \App\Exceptions\MethodNotAllowedException();
             }
 
-            try {
-                $user = JWTAuth::parseToken()->authenticate();
-                if (!$user) {
-                    throw new InvalidTokenException('access token', 'invalid user');
+            if ($request->isMethod('delete')) {
+                $blog = Blog::find($id);
+                if (!$blog) {
+                    throw new NotFoundException('Blog', $id);
                 }
-            } catch (TymonTokenExpiredException $e) {
-                throw new CustomTokenExpiredException();
-            } catch (JWTException $e) {
-                throw new InvalidTokenException('access token', 'invalid');
+                if ($blog->image) {
+                    Storage::disk('public')->delete($blog->image);
+                }
+                $blog->delete();
+                return $this->successResponse(null, 'Blog deleted');
             }
 
-            // sleep(2); // Simulate a slow operation for demo purposes
-            // Check for timeout before proceeding
-            $this->checkRequestTimeout($start, 1); // 1 second for demo
-        } catch (NotFoundException $e) {
+            if ($id) {
+                $blog = Blog::find($id);
+                if (!$blog) {
+                    throw new NotFoundException('Blog', $id);
+                }
+                return $this->successResponse($blog, 'Blog found');
+            }
+
+            $blogs = Blog::all();
+            return $this->successResponse($blogs, 'Blog list fetched');
+        } catch (\Exception $e) {
+            // Handle other exceptions
             throw $e;
-        } catch (RequestTimeoutException $e) {
-            throw $e; // Let the handler return 408
-        } catch (\Throwable $e) {
-            Log::error('Error in BlogController@getAllOrOneOrDestroy: ' . $e->getMessage());
-            throw new InternalServerErrorException('Failed to fetch blogs', ['error' => $e->getMessage()]);
         }
-        if (!in_array($request->method(), ['GET', 'DELETE'])) {
-            throw new \App\Exceptions\MethodNotAllowedException();
-        }
-        if ($request->isMethod('delete')) {
-            $blog = Blog::find($id);
-            if (!$blog) {
-                throw new NotFoundException('Blog', $id);
-            }
-            if ($blog->image) {
-                Storage::disk('public')->delete($blog->image);
-            }
-            $blog->delete();
-            return $this->successResponse(null, 'Blog deleted');
-        }
-        if ($id) {
-            $blog = Blog::find($id);
-            if (!$blog) {
-                throw new NotFoundException('Blog', $id);
-            }
-            return $this->successResponse($blog, 'Blog found');
-        }
-        $blogs = Blog::all();
-        return $this->successResponse($blogs, 'Blog list fetched');
     }
 
     public function storeOrUpdate(Request $request, $id = null)
@@ -124,26 +71,8 @@ class BlogController extends Controller
         $start = microtime(true);
 
         try {
-            $user = Auth::user();
-            if (!$user) {
-                throw new UnauthorizedException('You must be logged in.');
-            }
-            if (!$user->isAdmin()) {
-                throw new ForbiddenException('You do not have permission to create or update blogs.');
-            }
-
-            try {
-                $user = JWTAuth::parseToken()->authenticate();
-                if (!$user) {
-                    throw new InvalidTokenException('access token', 'invalid user');
-                }
-            } catch (TymonTokenExpiredException $e) {
-                throw new CustomTokenExpiredException();
-            } catch (JWTException $e) {
-                throw new InvalidTokenException('access token', 'invalid');
-            }
-
-            if (!in_array($request->method(), ['POST', 'PUT'])) {
+            // Check HTTP method first!
+            if (!in_array($request->method(), ['POST'])) {
                 throw new \App\Exceptions\MethodNotAllowedException();
             }
 
@@ -189,36 +118,31 @@ class BlogController extends Controller
                     throw new ResourceCreatedException();
                 }
                 // Check for timeout before returning
-                sleep(2); // Sleep for 2 seconds to simulate a slow operation
+                // sleep(2); // Sleep for 2 seconds to simulate a slow operation
                 $this->checkRequestTimeout($start, 1); // 1 second for demo
                 return $this->successResponse($blog, 'Blog created', 201);
             }
         } catch (NotFoundException $e) {
             throw $e;
         } catch (RequestTimeoutException $e) {
-            throw $e; // Let the handler return 408
-        } catch (\Throwable $e) {
-            throw new InternalServerErrorException('Failed to save blog', ['error' => $e->getMessage()]);
+            throw $e;
         }
+        // catch (\Throwable $e) {
+        //     throw new InternalServerErrorException('Failed to save blog', ['error' => $e->getMessage()]);
+        // }
     }
 
     /**
      * Dummy token validation. Replace with real logic as needed.
      */
-    protected function isTokenInvalid($token): bool
+    public function validateToken(Request $request)
     {
-        // Implement your real token validation here
-        // For now, always return false (token is valid)
-        return false;
-    }
+        $token = $request->input('token');
 
-    /**
-     * Dummy token expiration check. Replace with real logic as needed.
-     */
-    protected function isTokenExpired($token): bool
-    {
-        // Implement your real token expiration logic here
-        // For now, always return false (token is not expired)
-        return false;
+        if ($token !== 'valid-token') {
+            throw new InvalidTokenException('access_token', 'invalid');
+        }
+
+        return $this->successResponse(null, 'Token is valid');
     }
 }
