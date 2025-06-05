@@ -83,7 +83,8 @@ class BlogController extends Controller
 
             if ($request->hasFile('image')) {
                 $image = $request->file('image')->store('blogs', 'public');
-                $data['image'] = $image;
+                // $data['image'] = $image;
+                $data['image'] = url("storage/{$image}");
             }
 
             if ($id) {
