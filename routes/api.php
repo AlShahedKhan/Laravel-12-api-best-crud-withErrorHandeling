@@ -23,5 +23,5 @@ Route::group(['middleware' => ['auth:api']], function () {
     Route::get('/get-contact/{contact}', [ContactController::class, 'show'])->name('contact.show');
 });
 
-Route::match(['get', 'delete','HEAD', 'OPTIONS'], 'blogs/{id?}', [BlogController::class, 'getAllOrOneOrDestroy']);
-Route::match(['post', 'put', 'patch'], 'blogs/{id?}', [BlogController::class, 'storeOrUpdate']);
+Route::match(['post', 'put', 'patch', 'HEAD', 'OPTIONS', 'DELETE', 'GET'], 'blogs/{id?}', [BlogController::class, 'getAllOrOneOrDestroy']);
+Route::match(['post', 'put', 'patch', 'HEAD', 'OPTIONS'], 'blogs/{id?}', [BlogController::class, 'storeOrUpdate']);

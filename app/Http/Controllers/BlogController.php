@@ -4,25 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Blog;
 use Illuminate\Http\Request;
-use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Traits\HandlesApiResponses;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
 use App\Exceptions\NotFoundException;
-use App\Exceptions\ForbiddenException;
 use App\Exceptions\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use App\Exceptions\InvalidTokenException;
-use App\Exceptions\TokenExpiredException;
-use App\Exceptions\UnauthorizedException;
-use Tymon\JWTAuth\Exceptions\JWTException;
 use App\Exceptions\RequestTimeoutException;
 use App\Exceptions\ResourceCreatedException;
-use App\Exceptions\InternalServerErrorException;
-use App\Exceptions\RefreshTokenExpiredException;
-use App\Exceptions\TokenExpiredException as CustomTokenExpiredException;
 use App\Traits\AuthenticatedAdminCheck;
-use Tymon\JWTAuth\Exceptions\TokenExpiredException as TymonTokenExpiredException;
 use App\Traits\ChecksRequestTimeout;
 
 class BlogController extends Controller
@@ -71,6 +60,7 @@ class BlogController extends Controller
         $start = microtime(true);
 
         try {
+            $this->checkIfAuthenticatedAndAdmin();
             // Check HTTP method first!
             if (!in_array($request->method(), ['POST'])) {
                 throw new \App\Exceptions\MethodNotAllowedException();
@@ -109,7 +99,7 @@ class BlogController extends Controller
                     throw new ResourceCreatedException('Resource created successfully (demo)');
                 }
                 // Check for timeout before returning
-                sleep(2); // Sleep for 2 seconds to simulate a slow operation
+                // sleep(2); // Sleep for 2 seconds to simulate a slow operation
                 $this->checkRequestTimeout($start, 1); // 1 second for demo
                 return $this->successResponse($blog, 'Blog updated');
             } else {
@@ -127,14 +117,9 @@ class BlogController extends Controller
         } catch (RequestTimeoutException $e) {
             throw $e;
         }
-        // catch (\Throwable $e) {
-        //     throw new InternalServerErrorException('Failed to save blog', ['error' => $e->getMessage()]);
-        // }
     }
 
-    /**
-     * Dummy token validation. Replace with real logic as needed.
-     */
+
     public function validateToken(Request $request)
     {
         $token = $request->input('token');
