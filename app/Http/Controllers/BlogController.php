@@ -50,7 +50,6 @@ class BlogController extends Controller
             $blogs = Blog::all();
             return $this->successResponse($blogs, 'Blog list fetched');
         } catch (\Exception $e) {
-            // Handle other exceptions
             throw $e;
         }
     }
@@ -83,7 +82,6 @@ class BlogController extends Controller
 
             if ($request->hasFile('image')) {
                 $image = $request->file('image')->store('blogs', 'public');
-                // $data['image'] = $image;
                 $data['image'] = url("storage/{$image}");
             }
 
